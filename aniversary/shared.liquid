@@ -28,6 +28,7 @@
     .aniv-date__big--sm { font-size: 64px; }
     .aniv-date__big--xs { font-size: 40px; }
     .aniv-date__year { font-size: 24px; margin-top: 16px; }
+    .aniv-date__next { display: block; font-size: 16px; margin-top: 10px; opacity: 0.75; }
     .aniv-date--row { flex-direction: row; gap: 24px; }
     .aniv-date--row .aniv-date__weekday { font-size: 22px; }
     .aniv-date--quad { gap: 2px; }
@@ -41,6 +42,7 @@
 
     .timeline-event { position: absolute; top: 50%; transform: translate(-50%, -50%); }
     .timeline-event__dot { width: 8px; height: 8px; border-radius: 50%; border: 2px solid #000; background: #fff; display: block; }
+    .timeline-event__dot--once { border-radius: 0; }
     .timeline-event__label { position: absolute; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; line-height: 1.1; max-width: 110px; }
     .timeline-event__title { font-size: 15px; font-weight: 600; text-align: center; }
     .timeline-event__sub { font-size: 12px; }
@@ -52,20 +54,29 @@
     .aniv-timeline--compact .timeline-event__label { max-width: 80px; }
     .aniv-timeline--narrow .timeline-event__label { max-width: 60px; }
 
+    .timeline-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%, 32px); font-size: 14px; opacity: 0.6; white-space: nowrap; }
+    .aniv-timeline--compact .timeline-empty { font-size: 11px; }
+
     .month-tick { position: absolute; bottom: 6px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
     .month-tick__line { width: 1px; height: 10px; background: #000; opacity: 0.5; }
     .month-tick__label { font-size: 13px; margin-top: 2px; opacity: 0.7; }
+
+    .quad-list { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 0 18px; box-sizing: border-box; }
+    .quad-list__item { display: flex; flex-direction: column; line-height: 1.2; }
+    .quad-list__date { font-size: 14px; font-weight: 700; }
+    .quad-list__days { font-size: 11px; opacity: 0.7; }
+    .quad-list__empty { font-size: 13px; opacity: 0.6; text-align: center; width: 100%; }
   </style>
 {% endtemplate %}
 
 {% template timeline_dot %}
-  {% comment %} params: pct, label, sub, stagger {% endcomment %}
+  {% comment %} params: pct, label, sub, stagger, shape {% endcomment %}
   {% assign row_class = "timeline-event--down" %}
   {% if stagger == 1 %}
     {% assign row_class = "timeline-event--up" %}
   {% endif %}
   <div class="timeline-event {{ row_class }}" style="left: {{ pct }}%;">
-    <div class="timeline-event__dot"></div>
+    <div class="timeline-event__dot timeline-event__dot--{{ shape }}"></div>
     <div class="timeline-event__label">
       <span class="timeline-event__title">{{ label }}</span>
       {% if sub != blank %}<span class="timeline-event__sub">{{ sub }}</span>{% endif %}
@@ -110,9 +121,17 @@
   {% assign window_span = fwd_seconds | plus: back_seconds %}
   {% assign today_pct = back_seconds | times: 100.0 | divided_by: window_span %}
 
-  {% comment %} ---- parse the special_dates textarea into positioned dots ---- {% endcomment %}
+  {% comment %}
+    ---- parse special_dates: render window dots, and separately track the
+    two closest upcoming occurrences (next1/next2) regardless of whether
+    they fall inside the graphical window. Two scalar "smallest so far"
+    slots instead of a sortable array/JSON round-trip, since only the
+    primitives already proven to work on-device are used here.
+  {% endcomment %}
   {% assign lines = special_dates | split: nl %}
   {% assign dot_count = 0 %}
+  {% assign next1_ts = -1 %}
+  {% assign next2_ts = -1 %}
   {% capture dots_html %}
     {% for line in lines %}
       {% assign line = line | strip %}
@@ -127,10 +146,28 @@
           {% if recur == "once" %}
             {% if date_parts.size == 3 %}
               {% assign ev_ts = raw_date | date: "%s" | plus: 0 %}
+              {% assign ev_date_label = raw_date | date: "%b %-d" %}
+              {% if ev_ts >= now_ts %}
+                {% if next1_ts == -1 or ev_ts < next1_ts %}
+                  {% assign next2_ts = next1_ts %}
+                  {% assign next2_label = next1_label %}
+                  {% assign next2_sub = next1_sub %}
+                  {% assign next2_date_label = next1_date_label %}
+                  {% assign next1_ts = ev_ts %}
+                  {% assign next1_label = ev_label %}
+                  {% assign next1_sub = "" %}
+                  {% assign next1_date_label = ev_date_label %}
+                {% elsif next2_ts == -1 or ev_ts < next2_ts %}
+                  {% assign next2_ts = ev_ts %}
+                  {% assign next2_label = ev_label %}
+                  {% assign next2_sub = "" %}
+                  {% assign next2_date_label = ev_date_label %}
+                {% endif %}
+              {% endif %}
               {% if ev_ts >= window_start_ts and ev_ts <= window_end_ts %}
                 {% assign pct = ev_ts | minus: window_start_ts | times: 100.0 | divided_by: window_span %}
                 {% assign stagger = dot_count | modulo: 2 %}
-                {% render "timeline_dot", pct: pct, label: ev_label, sub: "", stagger: stagger %}
+                {% render "timeline_dot", pct: pct, label: ev_label, sub: "", stagger: stagger, shape: "once" %}
                 {% assign dot_count = dot_count | plus: 1 %}
               {% endif %}
             {% endif %}
@@ -150,17 +187,35 @@
                 {% assign cand_year = today_year | plus: yoffset %}
                 {% assign cand_date = cand_year | append: "-" | append: ev_month | append: "-" | append: ev_day %}
                 {% assign cand_ts = cand_date | date: "%s" | plus: 0 %}
+                {% assign cand_date_label = cand_date | date: "%b %-d" %}
+                {% assign sub = "" %}
+                {% if start_year != "" %}
+                  {% assign age = cand_year | minus: start_year %}
+                  {% if age >= 0 %}
+                    {% assign sub = age | append: " yrs" %}
+                  {% endif %}
+                {% endif %}
+                {% if cand_ts >= now_ts %}
+                  {% if next1_ts == -1 or cand_ts < next1_ts %}
+                    {% assign next2_ts = next1_ts %}
+                    {% assign next2_label = next1_label %}
+                    {% assign next2_sub = next1_sub %}
+                    {% assign next2_date_label = next1_date_label %}
+                    {% assign next1_ts = cand_ts %}
+                    {% assign next1_label = ev_label %}
+                    {% assign next1_sub = sub %}
+                    {% assign next1_date_label = cand_date_label %}
+                  {% elsif next2_ts == -1 or cand_ts < next2_ts %}
+                    {% assign next2_ts = cand_ts %}
+                    {% assign next2_label = ev_label %}
+                    {% assign next2_sub = sub %}
+                    {% assign next2_date_label = cand_date_label %}
+                  {% endif %}
+                {% endif %}
                 {% if cand_ts >= window_start_ts and cand_ts <= window_end_ts %}
                   {% assign pct = cand_ts | minus: window_start_ts | times: 100.0 | divided_by: window_span %}
-                  {% assign sub = "" %}
-                  {% if start_year != "" %}
-                    {% assign age = cand_year | minus: start_year %}
-                    {% if age >= 0 %}
-                      {% assign sub = age | append: " yrs" %}
-                    {% endif %}
-                  {% endif %}
                   {% assign stagger = dot_count | modulo: 2 %}
-                  {% render "timeline_dot", pct: pct, label: ev_label, sub: sub, stagger: stagger %}
+                  {% render "timeline_dot", pct: pct, label: ev_label, sub: sub, stagger: stagger, shape: "yearly" %}
                   {% assign dot_count = dot_count | plus: 1 %}
                 {% endif %}
               {% endfor %}
@@ -170,6 +225,12 @@
       {% endif %}
     {% endfor %}
   {% endcapture %}
+
+  {% assign days_until = 0 %}
+  {% if next1_ts != -1 %}
+    {% assign secs_until = next1_ts | minus: now_ts %}
+    {% assign days_until = secs_until | plus: 43200 | divided_by: 86400 %}
+  {% endif %}
 
   {% comment %} ---- month ruler (skipped in compact modes) ---- {% endcomment %}
   {% capture ticks_html %}
@@ -200,6 +261,9 @@
         <span class="aniv-date__weekday">{{ today_weekday }}</span>
         <span class="aniv-date__big">{{ today_month_day }}</span>
         <span class="aniv-date__year">{{ today_year }}</span>
+        {% if next1_ts != -1 %}
+          <span class="aniv-date__next">Next: {{ next1_label }} in {{ days_until }} day{% if days_until != 1 %}s{% endif %}</span>
+        {% endif %}
       </div>
     </div>
     <div class="aniv-half" style="flex: 0 0 45%;">
@@ -211,6 +275,7 @@
         </div>
         {{ ticks_html }}
         {{ dots_html }}
+        {% if dot_count == 0 %}<div class="timeline-empty">No dates in range</div>{% endif %}
       </div>
     </div>
   {% when "half_horizontal" %}
@@ -227,6 +292,7 @@
           <span class="timeline-today__dot"></span>
         </div>
         {{ dots_html }}
+        {% if dot_count == 0 %}<div class="timeline-empty">No dates in range</div>{% endif %}
       </div>
     </div>
   {% when "half_vertical" %}
@@ -244,22 +310,32 @@
           <span class="timeline-today__dot"></span>
         </div>
         {{ dots_html }}
+        {% if dot_count == 0 %}<div class="timeline-empty">No dates in range</div>{% endif %}
       </div>
     </div>
   {% when "quadrant" %}
-    <div class="aniv-half" style="flex: 0 0 45%;">
+    <div class="aniv-half" style="flex: 0 0 40%;">
       <div class="aniv-date aniv-date--quad">
         <span class="aniv-date__big aniv-date__big--xs">{{ today_month_day }}</span>
         <span class="aniv-date__weekday">{{ today_weekday }}</span>
       </div>
     </div>
-    <div class="aniv-half" style="flex: 0 0 55%;">
-      <div class="aniv-timeline aniv-timeline--compact aniv-timeline--narrow">
-        <div class="timeline-track"></div>
-        <div class="timeline-today" style="left: {{ today_pct }}%;">
-          <span class="timeline-today__dot"></span>
-        </div>
-        {{ dots_html }}
+    <div class="aniv-half" style="flex: 0 0 60%; align-items: flex-start;">
+      <div class="quad-list">
+        {% if next1_ts == -1 %}
+          <div class="quad-list__empty">No upcoming dates</div>
+        {% else %}
+          <div class="quad-list__item">
+            <span class="quad-list__date">{{ next1_date_label }} &mdash; {{ next1_label }}</span>
+            <span class="quad-list__days">in {{ days_until }}d{% if next1_sub != blank %} &middot; {{ next1_sub }}{% endif %}</span>
+          </div>
+          {% if next2_ts != -1 %}
+            <div class="quad-list__item">
+              <span class="quad-list__date">{{ next2_date_label }} &mdash; {{ next2_label }}</span>
+              {% if next2_sub != blank %}<span class="quad-list__days">{{ next2_sub }}</span>{% endif %}
+            </div>
+          {% endif %}
+        {% endif %}
       </div>
     </div>
   {% endcase %}

@@ -56,7 +56,27 @@ Example:
 
 Blank lines are ignored. The timeline window defaults to 1 month back / 4
 months forward from today (in the device owner's timezone); both are
-user-configurable per instance via `months_back` / `months_forward`.
+user-configurable per instance via `months_back` / `months_forward`. Note
+that `months_back`/`months_forward` only affect the graphical timeline
+(full/half_horizontal/half_vertical) — the quadrant layout and the "Next: ...
+in N days" caption always look at the closest upcoming occurrence(s)
+regardless of that window, since there usually isn't room to show much on a
+quadrant tile anyway.
+
+## What's new
+
+- **Dot shape**: one-time events render as a square dot, yearly-recurring
+  events as a circle, so you can tell them apart on the timeline at a
+  glance without reading labels.
+- **"Next: ... in N days"**: the full layout shows a one-line summary under
+  the year, naming the single closest upcoming date and a day count,
+  independent of what's visible on the timeline below it.
+- **Empty state**: if nothing falls inside the graphical window, the
+  timeline shows "No dates in range" instead of a bare line.
+- **Quadrant redesign**: quadrant no longer tries to cram a timeline into
+  ~400×240px. It shows the closest 1–2 upcoming dates as a compact text
+  list (date, label, days-until, age badge), which is far more legible at
+  that size. If nothing is upcoming at all, it shows "No upcoming dates".
 
 ## How it works (confirmed on-device)
 
@@ -94,6 +114,18 @@ user-configurable per instance via `months_back` / `months_forward`.
   dot-only for events within N days of another).
 - No native "timeline" component exists in the TRMNL framework, so it's
   hand-built with absolutely-positioned divs over a flex container.
+- **"Closest upcoming" tracking** (powers the "Next: ... in N days" caption
+  and the quadrant list) is done with two plain scalar variables
+  (`next1_*` / `next2_*`) updated during the same line-parsing loop that
+  builds the timeline dots — a manual "smallest and second-smallest"
+  comparison, not a sorted array. This was a deliberate choice over
+  building a JSON array and using `sort`/`parse_json`/`limit`: those
+  filters are documented as available, but only the primitives already
+  proven working on a real device (`assign`, `if`, `for`, `date`, `split`)
+  were used here, to avoid another multi-round debugging cycle like the
+  `custom_fields_values` and dot-centering ones above. **Not yet verified
+  on-device** — if "Next: ..." or the quadrant list look wrong, that's the
+  first place to check.
 
 ## Known limitations
 
