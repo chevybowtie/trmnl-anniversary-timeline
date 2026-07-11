@@ -1,0 +1,40 @@
+# Reference spec for the Custom Fields you need to create in the TRMNL
+# dashboard (Private Plugins -> Anniversary Timeline -> Edit -> Custom Fields).
+# The dashboard's field builder is a UI, not a YAML upload -- use this file
+# as the checklist of what to enter for each field.
+#
+# strategy: No Code / Static (all data comes from custom fields; no polling
+# URL or webhook is required).
+
+name: Anniversary Timeline
+strategy: static
+
+custom_fields:
+  - keyname: special_dates
+    name: Special Dates
+    field_type: text          # multi-line text area in the field builder
+    description: >
+      One event per line: DATE|Label|RECURRENCE
+        1993-03-20|Wedding Anniversary|yearly
+        1950-03-02|Mom's Birthday|yearly    (year enables an "N yrs" badge)
+        03-15|Unknown-year Birthday|yearly (no year -> no age badge)
+        2026-12-25|Summer Vacation|once
+    placeholder: |
+      1993-03-20|Wedding Anniversary|yearly
+      1990-03-02|Mom's Birthday|yearly
+      2026-12-25|Summer Vacation|once
+    required: true
+
+  - keyname: months_back
+    name: Months Back
+    field_type: number
+    description: How many months into the past the timeline should start.
+    default: 1
+    required: false
+
+  - keyname: months_forward
+    name: Months Forward
+    field_type: number
+    description: How many months into the future the timeline should extend.
+    default: 4
+    required: false
