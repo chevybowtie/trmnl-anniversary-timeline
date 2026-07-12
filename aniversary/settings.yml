@@ -16,7 +16,7 @@ custom_fields:
     description: >
       One event per line: DATE|Label|RECURRENCE
         1993-03-20|Wedding Anniversary|yearly
-        1950-03-02|Mom's Birthday|yearly    (year enables an "N yrs" badge)
+        1950-03-02|Mom's Birthday|yearly   (year enables an "N yrs" badge)
         03-15|Unknown-year Birthday|yearly (no year -> no age badge)
         2026-12-25|Summer Vacation|once
     placeholder: |
@@ -38,3 +38,16 @@ custom_fields:
     description: How many months into the future the timeline should extend.
     default: 4
     required: false
+
+  # Required by TRMNL's marketplace checker (CHEF) for any plugin 
+  # intendedfor public listing: gives end users a way to reach 
+  # the author for support. Not read by any .liquid 
+  # template -- this is purely metadata.
+  #
+  - keyname: author_bio
+    name: About This Plugin
+    category: calendar
+    field_type: author_bio
+    description: Timeline of upcoming events
+    github_url: https://github.com/chevybowtie/trmnl-anniversary-timeline
+    email_address: paul.sturm@cotton-software.com 

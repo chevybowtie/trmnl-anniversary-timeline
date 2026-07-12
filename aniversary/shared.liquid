@@ -20,7 +20,28 @@
 
 {% template anniversary_styles %}
   <style>
+    {% comment %}
+      No CSS opacity anywhere here -- it's explicitly flagged by TRMNL's
+      plugin checker and renders unreliably on 1-bit e-ink. The Framework's
+      text--gray-NN classes were tried as the suggested replacement for
+      de-emphasized text, but on-device (confirmed on a real TRMNL) the
+      dither pattern they use breaks small text (under ~16px) into
+      illegible dots rather than a clean gray -- fine on large text, not on
+      captions/labels this size. So small secondary text here is just plain
+      solid black, differentiated from primary text by size/weight alone.
+    {% endcomment %}
+
+    .aniv-view { display: flex; flex-direction: column; height: 100%; }
+    .aniv-layout { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .aniv-layout--center { justify-content: center; }
+
     .aniv-half { width: 100%; box-sizing: border-box; min-height: 0; display: flex; align-items: center; justify-content: center; }
+    .aniv-half--start { align-items: flex-start; }
+    .aniv-half--r40 { flex: 0 0 40%; }
+    .aniv-half--r45 { flex: 0 0 45%; }
+    .aniv-half--r50 { flex: 0 0 50%; }
+    .aniv-half--r55 { flex: 0 0 55%; }
+    .aniv-half--r60 { flex: 0 0 60%; }
 
     .aniv-date { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%; }
     .aniv-date__weekday { font-size: 28px; letter-spacing: 2px; text-transform: uppercase; }
@@ -28,7 +49,7 @@
     .aniv-date__big--sm { font-size: 64px; }
     .aniv-date__big--xs { font-size: 40px; }
     .aniv-date__year { font-size: 24px; margin-top: 16px; }
-    .aniv-date__next { display: block; font-size: 16px; margin-top: 10px; opacity: 0.75; }
+    .aniv-date__next { display: block; font-size: 16px; margin-top: 10px; }
     .aniv-date--row { flex-direction: row; gap: 24px; }
     .aniv-date--row .aniv-date__weekday { font-size: 22px; }
     .aniv-date--quad { gap: 2px; }
@@ -54,18 +75,28 @@
     .aniv-timeline--compact .timeline-event__label { max-width: 80px; }
     .aniv-timeline--narrow .timeline-event__label { max-width: 60px; }
 
-    .timeline-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%, 32px); font-size: 14px; opacity: 0.6; white-space: nowrap; }
+    .timeline-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%, 32px); font-size: 14px; white-space: nowrap; }
     .aniv-timeline--compact .timeline-empty { font-size: 11px; }
 
     .month-tick { position: absolute; bottom: 6px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
-    .month-tick__line { width: 1px; height: 10px; background: #000; opacity: 0.5; }
-    .month-tick__label { font-size: 13px; margin-top: 2px; opacity: 0.7; }
+    .month-tick__line { width: 1px; height: 8px; background: #000; }
+    .month-tick__label { font-size: 13px; margin-top: 2px; }
 
     .quad-list { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 0 18px; box-sizing: border-box; }
     .quad-list__item { display: flex; flex-direction: column; line-height: 1.2; }
     .quad-list__date { font-size: 14px; font-weight: 700; }
-    .quad-list__days { font-size: 11px; opacity: 0.7; }
-    .quad-list__empty { font-size: 13px; opacity: 0.6; text-align: center; width: 100%; }
+    .quad-list__days { font-size: 11px; }
+    .quad-list__empty { font-size: 13px; text-align: center; width: 100%; }
+
+    {% comment %}
+      Positional utility classes, generated once here instead of using
+      inline `style="left: N%"` on every dot/tick -- CHEF (TRMNL's plugin
+      checker) flags inline styles even when they're per-render computed
+      values, so dot/tick/today position is expressed as a class name
+      (.pos-0 .. .pos-100) picked at render time instead.
+    {% endcomment %}
+    {% for i in (0..100) %}.pos-{{ i }} { left: {{ i }}%; }
+    {% endfor %}
   </style>
 {% endtemplate %}
 
@@ -75,10 +106,11 @@
   {% if stagger == 1 %}
     {% assign row_class = "timeline-event--up" %}
   {% endif %}
-  <div class="timeline-event {{ row_class }}" style="left: {{ pct }}%;">
+  {% assign pos_class = "pos-" | append: pct %}
+  <div class="timeline-event {{ row_class }} {{ pos_class }}">
     <div class="timeline-event__dot timeline-event__dot--{{ shape }}"></div>
     <div class="timeline-event__label">
-      <span class="timeline-event__title">{{ label }}</span>
+      <span class="timeline-event__title">{{ label | truncate: 24 }}</span>
       {% if sub != blank %}<span class="timeline-event__sub">{{ sub }}</span>{% endif %}
     </div>
   </div>
@@ -86,7 +118,8 @@
 
 {% template month_tick %}
   {% comment %} params: pct, text {% endcomment %}
-  <div class="month-tick" style="left: {{ pct }}%;">
+  {% assign pos_class = "pos-" | append: pct %}
+  <div class="month-tick {{ pos_class }}">
     <span class="month-tick__line"></span>
     <span class="month-tick__label">{{ text }}</span>
   </div>
@@ -119,7 +152,7 @@
   {% assign window_start_ts = now_ts | minus: back_seconds %}
   {% assign window_end_ts = now_ts | plus: fwd_seconds %}
   {% assign window_span = fwd_seconds | plus: back_seconds %}
-  {% assign today_pct = back_seconds | times: 100.0 | divided_by: window_span %}
+  {% assign today_pct = back_seconds | times: 100.0 | divided_by: window_span | round %}
 
   {% comment %}
     ---- parse special_dates: render window dots, and separately track the
@@ -165,7 +198,7 @@
                 {% endif %}
               {% endif %}
               {% if ev_ts >= window_start_ts and ev_ts <= window_end_ts %}
-                {% assign pct = ev_ts | minus: window_start_ts | times: 100.0 | divided_by: window_span %}
+                {% assign pct = ev_ts | minus: window_start_ts | times: 100.0 | divided_by: window_span | round %}
                 {% assign stagger = dot_count | modulo: 2 %}
                 {% render "timeline_dot", pct: pct, label: ev_label, sub: "", stagger: stagger, shape: "once" %}
                 {% assign dot_count = dot_count | plus: 1 %}
@@ -213,7 +246,7 @@
                   {% endif %}
                 {% endif %}
                 {% if cand_ts >= window_start_ts and cand_ts <= window_end_ts %}
-                  {% assign pct = cand_ts | minus: window_start_ts | times: 100.0 | divided_by: window_span %}
+                  {% assign pct = cand_ts | minus: window_start_ts | times: 100.0 | divided_by: window_span | round %}
                   {% assign stagger = dot_count | modulo: 2 %}
                   {% render "timeline_dot", pct: pct, label: ev_label, sub: sub, stagger: stagger, shape: "yearly" %}
                   {% assign dot_count = dot_count | plus: 1 %}
@@ -245,7 +278,7 @@
         {% assign tick_date = tick_year | append: "-" | append: tick_month1 | append: "-01" %}
         {% assign tick_ts = tick_date | date: "%s" | plus: 0 %}
         {% if tick_ts >= window_start_ts and tick_ts <= window_end_ts %}
-          {% assign pct = tick_ts | minus: window_start_ts | times: 100.0 | divided_by: window_span %}
+          {% assign pct = tick_ts | minus: window_start_ts | times: 100.0 | divided_by: window_span | round %}
           {% assign tick_label = tick_date | date: "%b" %}
           {% render "month_tick", pct: pct, text: tick_label %}
         {% endif %}
@@ -256,20 +289,20 @@
   {% comment %} ---- assemble output for the requested layout ---- {% endcomment %}
   {% case mode %}
   {% when "full" %}
-    <div class="aniv-half" style="flex: 0 0 55%;">
+    <div class="aniv-half aniv-half--r55">
       <div class="aniv-date">
         <span class="aniv-date__weekday">{{ today_weekday }}</span>
         <span class="aniv-date__big">{{ today_month_day }}</span>
         <span class="aniv-date__year">{{ today_year }}</span>
         {% if next1_ts != -1 %}
-          <span class="aniv-date__next">Next: {{ next1_label }} in {{ days_until }} day{% if days_until != 1 %}s{% endif %}</span>
+          <span class="aniv-date__next">Next: {{ next1_label | truncate: 30 }} in {{ days_until }} day{% if days_until != 1 %}s{% endif %}</span>
         {% endif %}
       </div>
     </div>
-    <div class="aniv-half" style="flex: 0 0 45%;">
+    <div class="aniv-half aniv-half--r45">
       <div class="aniv-timeline aniv-timeline--full">
         <div class="timeline-track"></div>
-        <div class="timeline-today" style="left: {{ today_pct }}%;">
+        <div class="timeline-today pos-{{ today_pct }}">
           <span class="timeline-today__dot"></span>
           <span class="timeline-today__label">Today</span>
         </div>
@@ -279,16 +312,16 @@
       </div>
     </div>
   {% when "half_horizontal" %}
-    <div class="aniv-half" style="flex: 0 0 40%;">
+    <div class="aniv-half aniv-half--r40">
       <div class="aniv-date aniv-date--row">
         <span class="aniv-date__big aniv-date__big--sm">{{ today_month_day }}</span>
         <span class="aniv-date__weekday">{{ today_weekday }}, {{ today_year }}</span>
       </div>
     </div>
-    <div class="aniv-half" style="flex: 0 0 60%;">
+    <div class="aniv-half aniv-half--r60">
       <div class="aniv-timeline aniv-timeline--compact">
         <div class="timeline-track"></div>
-        <div class="timeline-today" style="left: {{ today_pct }}%;">
+        <div class="timeline-today pos-{{ today_pct }}">
           <span class="timeline-today__dot"></span>
         </div>
         {{ dots_html }}
@@ -296,17 +329,17 @@
       </div>
     </div>
   {% when "half_vertical" %}
-    <div class="aniv-half" style="flex: 0 0 50%;">
+    <div class="aniv-half aniv-half--r50">
       <div class="aniv-date">
         <span class="aniv-date__weekday">{{ today_weekday }}</span>
         <span class="aniv-date__big aniv-date__big--sm">{{ today_month_day }}</span>
         <span class="aniv-date__year">{{ today_year }}</span>
       </div>
     </div>
-    <div class="aniv-half" style="flex: 0 0 50%;">
+    <div class="aniv-half aniv-half--r50">
       <div class="aniv-timeline aniv-timeline--compact aniv-timeline--narrow">
         <div class="timeline-track"></div>
-        <div class="timeline-today" style="left: {{ today_pct }}%;">
+        <div class="timeline-today pos-{{ today_pct }}">
           <span class="timeline-today__dot"></span>
         </div>
         {{ dots_html }}
@@ -314,24 +347,24 @@
       </div>
     </div>
   {% when "quadrant" %}
-    <div class="aniv-half" style="flex: 0 0 40%;">
+    <div class="aniv-half aniv-half--r40">
       <div class="aniv-date aniv-date--quad">
         <span class="aniv-date__big aniv-date__big--xs">{{ today_month_day }}</span>
         <span class="aniv-date__weekday">{{ today_weekday }}</span>
       </div>
     </div>
-    <div class="aniv-half" style="flex: 0 0 60%; align-items: flex-start;">
+    <div class="aniv-half aniv-half--r60 aniv-half--start">
       <div class="quad-list">
         {% if next1_ts == -1 %}
           <div class="quad-list__empty">No upcoming dates</div>
         {% else %}
           <div class="quad-list__item">
-            <span class="quad-list__date">{{ next1_date_label }} &mdash; {{ next1_label }}</span>
+            <span class="quad-list__date">{{ next1_date_label }} &mdash; {{ next1_label | truncate: 20 }}</span>
             <span class="quad-list__days">in {{ days_until }}d{% if next1_sub != blank %} &middot; {{ next1_sub }}{% endif %}</span>
           </div>
           {% if next2_ts != -1 %}
             <div class="quad-list__item">
-              <span class="quad-list__date">{{ next2_date_label }} &mdash; {{ next2_label }}</span>
+              <span class="quad-list__date">{{ next2_date_label }} &mdash; {{ next2_label | truncate: 20 }}</span>
               {% if next2_sub != blank %}<span class="quad-list__days">{{ next2_sub }}</span>{% endif %}
             </div>
           {% endif %}

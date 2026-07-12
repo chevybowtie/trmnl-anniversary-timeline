@@ -20,10 +20,12 @@ anniversaries, one-time events) on the bottom half.
 1. In the TRMNL dashboard: **Plugins → Private Plugin → + New**.
 2. Name it "Anniversary Timeline", strategy **Static / No Code** (no polling
    URL or webhook needed — everything is driven by custom fields).
-3. Under **Custom Fields**, add the three fields described in `settings.yml`:
+3. Under **Custom Fields**, add the four fields described in `settings.yml`:
    - `special_dates` — long text area
    - `months_back` — number, default `1`
    - `months_forward` — number, default `4`
+   - `author_bio` — a way for users to reach you (required by TRMNL's
+     marketplace checker for public plugins; not read by any template)
 4. Open the **Markup Editor** and paste each `.liquid` file into its matching
    tab (Shared / Full / Half horizontal / Half vertical / Quadrant).
 5. Use the live previewer to sanity-check rendering, then add an instance and
@@ -137,6 +139,55 @@ quadrant tile anyway.
   the negative lower bound rather than a literal `(-1..1)` — done
   defensively while debugging and left in place since it's harmless, even
   though it may not have been the actual cause of any bug encountered.
+
+## Pre-submission checklist
+
+Based on TRMNL's [plugin publishing best-practices post](https://trmnl.com/blog/plugin-recipe-publishing-tips)
+and CHEF (their automated pre-review checker):
+
+- [x] All four markup layouts provided (full, half_horizontal, half_vertical,
+      quadrant) — required for public listing.
+- [x] No `opacity` in CSS anywhere. First pass replaced it with the
+      Framework's `text--gray-NN` classes on de-emphasized text, per CHEF's
+      suggestion — but confirmed on-device, the gray dither pattern breaks
+      small text (under ~16px) into illegible dots rather than a clean
+      gray. Reverted those specific elements to plain solid black text,
+      relying on size/weight alone for the visual hierarchy instead.
+      `text--gray-NN` may still be worth using for *larger* text if you
+      want a genuinely gray look somewhere later, just not below ~16-18px.
+- [x] Static/no-code strategy — no external API calls, so the "renderer
+      won't wait more than 5 seconds" async-timeout pitfall doesn't apply.
+- [x] Custom title bar icon, inlined as a data URI rather than an external
+      image link.
+- [x] Shared markup used to keep the four layouts DRY.
+- [x] User-entered labels are truncated (`| truncate: 20` / `24` / `30`)
+      so a long label can't overflow into neighboring dots or wrap
+      indefinitely.
+- [x] Zero inline `style=` attributes anywhere. Structural flex/height rules
+      use CSS classes (`aniv-view`, `aniv-layout`, `aniv-half--r*`, plus
+      real Framework classes like `gap--small`). Dot/tick/today
+      *positioning* (`left: N%`) initially seemed unavoidably inline since
+      it's a per-render computed value — but CHEF flagged it anyway, so it
+      now uses a generated `.pos-0`..`.pos-100` class per whole percentage
+      point (`{% for i in (0..100) %}` in the stylesheet) instead of a
+      `style=` attribute, with `pct`/`today_pct` rounded to match.
+- [x] `author_bio` custom field added in the dashboard.
+- [ ] **Category** — CHEF flags this as separate from `author_bio`; set it
+      in the plugin settings view (not part of `custom_fields`) — drives
+      marketplace browse/search visibility. See note in `settings.yml`.
+- [ ] **Icon** — TRMNL's plugin settings view has a dedicated icon upload
+      separate from the title-bar image in markup. Upload `icon.svg` there.
+- [ ] **Featured image** — generate/upload one in the plugin settings view
+      for the marketplace preview card.
+- [ ] **Use demo data for anything public** — if you submit screenshots or
+      demo credentials for review, swap in placeholder dates/names rather
+      than real family information; the live examples used while building
+      this (e.g. real birthdays) shouldn't end up in a public listing.
+- [ ] **Test every layout on-device**, not just full — half_horizontal,
+      half_vertical, and quadrant have only been reviewed in code so far,
+      not seen live. Test on both TRMNL OG (1-bit) and TRMNL X if you have
+      access to both, and TRMNL X portrait orientation, per their
+      "test every view across OG/X, landscape and portrait" guidance.
 
 ## Publishing to the marketplace
 

@@ -1,6 +1,6 @@
 {% render "anniversary_styles" %}
-<div class="view view--full" style="display: flex; flex-direction: column; height: 100%;">
-  <div class="layout" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+<div class="view view--full aniv-view">
+  <div class="layout aniv-layout">
     {% render "anniversary_screen", special_dates: trmnl.plugin_settings.custom_fields_values.special_dates, months_back: trmnl.plugin_settings.custom_fields_values.months_back, months_forward: trmnl.plugin_settings.custom_fields_values.months_forward, trmnl: trmnl, mode: "full", compact: false %}
   </div>
   <div class="title_bar">
@@ -9,3 +9,4 @@
     <span class="instance">{{ trmnl.plugin_settings.instance_name }}</span>
   </div>
 </div>
+
